@@ -1,0 +1,56 @@
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    49        18          8.9      0.5      0.9                  pred_img = predict[j].cpu().numpy()/3.0
+    50        18          5.6      0.3      0.6                  inp = img[j].squeeze() * 0.5 + 0.5
+    51        18          4.6      0.3      0.5                  img_orig = np.clip(inp,0,1)
+    52        18          2.7      0.1      0.3                  img_orig = np.array(img_orig)
+    53        18          9.3      0.5      1.0                  combine = np.hstack([img_orig,pred_img])
+    54        18        154.3      8.6     15.9                  plt.imsave('test/mask/{}'.format(img_path[j].split('/')[-1]), combine)
+3.3
+
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    49        18          1.2      0.1      0.2                  pred_numpy = predict[j].cpu().numpy()
+    50        18         10.0      0.6      1.2                  pred_img = (pred_numpy * (255.0 / 3.0)).astype(np.uint8) 
+    51        18          3.2      0.2      0.4                  inp = img[j].squeeze() * 0.5 + 0.5 
+    52        18          1.7      0.1      0.2                  img_orig = np.clip(inp.cpu().numpy(), 0, 1)
+    53        18          2.5      0.1      0.3                  img_orig_255 = (img_orig * 255.0).astype(np.uint8)
+    54                                                           
+    55        18          1.3      0.1      0.2                  combine = np.hstack([img_orig_255, pred_img]) 
+    56        18         30.3      1.7      3.7                  cv2.imwrite('test/mask/{}'.format(img_path[j].split('/')[-1]), combine)
+2.5
+
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    49        18         10.7      0.6      1.3                  inp_gpu = data[j].squeeze() * 0.5 + 0.5 
+    50        18          4.1      0.2      0.5                  pred_gpu = predict[j] / 3.0
+    51        18         13.1      0.7      1.5                  img_orig_gpu = torch.clamp(inp_gpu, 0, 1)
+    52        18          7.1      0.4      0.8                  img_orig_np = (img_orig_gpu * 255.0).cpu().numpy().astype(np.uint8)
+    53        18          1.9      0.1      0.2                  pred_np = (pred_gpu * 255.0).cpu().numpy().astype(np.uint8)
+    54        18          1.5      0.1      0.2                  combine = np.hstack([img_orig_np, pred_np]) 
+    55        18         27.0      1.5      3.2                  cv2.imwrite('test/mask/{}'.format(img_path[j].split('/')[-1]), combine)
+4.5
+
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    49        18          3.6      0.2      0.4                  inp_gpu = img[j].squeeze() * 0.5 + 0.5 
+    50        18          1.0      0.1      0.1                  img_orig_gpu = torch.clamp(inp_gpu, 0, 1) # [0, 1] 范围
+    51        18          4.1      0.2      0.5                  pred_gpu = predict[j].squeeze() / 3.0 # [0, 1] 范围
+    52        18          2.7      0.2      0.3                  combine_gpu = torch.hstack([img_orig_gpu, pred_gpu]) 
+    53        18          4.0      0.2      0.5                  display_frame = (combine_gpu * 255.0).byte().cpu().numpy() 
+    54        18         30.7      1.7      3.7                  cv2.imwrite('test/mask/{}'.format(img_path[j].split('/')[-1]), display_frame)
+1.8
+
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    51        18          3.7      0.2      0.4                      inp_gpu = img[j].squeeze() * 0.5 + 0.5 
+    52        18          0.9      0.0      0.1                      img_orig_gpu = torch.clamp(inp_gpu, 0, 1) # [0, 1] 范围
+    53        18          4.1      0.2      0.4                      pred_gpu = predict[j].squeeze() / 3.0 # [0, 1] 范围
+    54        18          2.5      0.1      0.3                      combine_gpu = torch.hstack([img_orig_gpu, pred_gpu]) 
+    55        18          3.7      0.2      0.4                      display_frame = (combine_gpu * 255.0).byte().cpu().numpy() 
+    56        18         31.0      1.7      3.3                      cv2.imwrite('test/mask/{}'.format(img_path[j].split('/')[-1]), display_frame)
+1.6(autocast)
