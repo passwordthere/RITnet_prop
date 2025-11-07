@@ -12,7 +12,8 @@ from models import model_dict
 
 
 def load_inference_model(model_name='densenet', filename='best_model.pkl'):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device('cpu')
     model = model_dict['densenet']
     model = model.to(device)
     state_dict = torch.load(filename, map_location=device) 

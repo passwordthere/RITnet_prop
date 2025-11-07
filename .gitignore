@@ -1,6 +1,3 @@
 /logs/
-/0try/
-/_pycache_/
-/Semantic_Segmentation_Dataset/
+/__pycache__/
 /test/
-*.zip
