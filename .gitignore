@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 /test/
 /$(ALLUSERSPROFILE)/
+mock_camera_od.tar.gz
