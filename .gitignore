@@ -6,3 +6,4 @@ __pycache__/
 mock_camera_od.tar.gz
 mock_camera_od
 .DS_Store
+/trt_cache/
