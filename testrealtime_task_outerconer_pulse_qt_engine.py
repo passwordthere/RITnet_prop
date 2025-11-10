@@ -1,5 +1,4 @@
 import cv2
-import torch
 import numpy as np
 import os
 import math
@@ -7,8 +6,41 @@ import time
 import socket
 import struct
 import threading
+import onnxruntime as ort
+import sys
 from torchvision import transforms
-from models import model_dict
+
+
+def init_model(redness=False):
+    model_path = 'infrared_fp16.onnx'
+    if redness:
+        model_path = 'visible.onnx'
+
+    trt_cache_path = os.path.join(os.path.dirname(model_path), "trt_cache")
+    os.makedirs(trt_cache_path, exist_ok=True)
+
+    sess_options = ort.SessionOptions()
+    sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    
+    providers = [
+        ('TensorrtExecutionProvider', {
+            'device_id': 0,
+            'trt_fp16_enable': True,
+            'trt_engine_cache_enable': True,
+            'trt_engine_cache_path': trt_cache_path,
+        }), # 
+        ('CUDAExecutionProvider', {
+            'device_id': 0,
+        }),
+        'CPUExecutionProvider'
+    ]
+    
+    session = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
+    input_name = session.get_inputs()[0].name
+    output_name = session.get_outputs()[0].name
+    
+    print(f"Model loaded! Provider: {session.get_providers()}")
+    return session, input_name, output_name
 
 
 def get_outermost_sclera_point(predict):
@@ -92,23 +124,16 @@ class CustomPreprocess:
         if frame.ndim == 3 and frame.shape[2] == 3:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
-        frame = cv2.resize(frame, self.target_size)
+        # frame = cv2.resize(frame, self.target_size)
         frame_uint8 = cv2.LUT(frame, self.table.astype('uint8'))    # 注意：LUT 操作需要 uint8 输入
         frame_clahe = self.clahe.apply(frame_uint8)                 # clahe.apply 也需要 uint8 输入
+        data = frame_clahe.astype(np.float16) / 255.0
+        data = (data - 0.5) / 0.5
+        data = np.expand_dims(data, axis=0) # Add channel dim: (1, 512, 768)
+        data = np.expand_dims(data, axis=0) # Add batch dim: (1, 1, 512, 768)
         
-        return frame_clahe
+        return data
 
-inference_transform = transforms.Compose([
-    CustomPreprocess(target_size=(768, 512)), # 应用自定义的 cv2 预处理
-    transforms.ToTensor(), # (H, W) np.uint8 -> (1, H, W) torch.float32
-    transforms.Normalize([0.5], [0.5]) # 标准化
-])
-
-def get_predictions(output):
-    bs,c,h,w = output.size()
-    indices = torch.argmax(output, dim=1) # (B, H, W)
-    indices = indices.view(bs,h,w) # bs x h x w
-    return indices
 
 # --- 1. 定义线程安全的全局变量 ---
 global_latest_clean_frame = None
@@ -168,7 +193,7 @@ def request_listener(sock: socket.socket):
 
 
 # --- 4. [修改] 主推理循环 (在主线程运行) ---
-def run_realtime_inference(model, device, transform, sock: socket.socket):
+def run_realtime_inference(session, input_name, output_name, sock: socket.socket):
     """
     这是主循环，只负责跑推理和发送实时画面。
     """
@@ -182,66 +207,54 @@ def run_realtime_inference(model, device, transform, sock: socket.socket):
             if f.lower().endswith(('.png', '.jpg', '.jpeg'))
         ])
     
-    if not image_files:
-        print(f"错误：在 {IMAGE_DIR} 中没有找到图片。")
-        return
-
+    preprocessor = CustomPreprocess()
+    
     print("[MainLoop] 开始实时推理...")
     frame_id = 0
-    with torch.no_grad():
-        while True:  # 无限循环
-            for img_path in image_files:
-                frame = cv2.imread(img_path)
-                frame_resized = cv2.resize(frame, (768, 512)) # "原图"
-                
-                # --- [线程安全] 更新全局原图 ---
-                with global_frame_lock:
-                    global_latest_clean_frame = frame_resized
-                # ----------------------------------
-                
-                gray_frame = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2GRAY)
-                image_tensor = transform(gray_frame)
-                data = image_tensor.unsqueeze(0).to(device) 
+    while True:  # 无限循环
+        for img_path in image_files:
+            frame = cv2.imread(img_path)
+            frame_resized = cv2.resize(frame, (768, 512))
+            
+            # --- [线程安全] 更新全局原图 ---
+            with global_frame_lock:
+                global_latest_clean_frame = frame
+            # ----------------------------------
+            
+            data = preprocessor(frame_resized)
+            outputs = session.run([output_name], {input_name: data})
+            output = outputs[0]
+            predict = np.argmax(output, axis=1) # Shape (1, 512, 768)
+            pred_cpu = np.squeeze(predict) # Shape (512, 768)
 
-                output = model(data) 
-                predict = get_predictions(output) 
-                pred_cpu = predict[0].cpu().numpy()
+            display_frame = draw_target_crosshair(frame_resized,  pred_cpu, frame_id,  offset_x=20,  offset_y=20)
+            frame_id += 1
 
-                display_frame = draw_target_crosshair(frame_resized,  pred_cpu, frame_id,  offset_x=20,  offset_y=20)
-                frame_id += 1
+            # 编码并发送 "带准星" 的图
+            result_display, encoded_display = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 85]) # 降低一点质量以提高帧率
+            
+            if not result_display:
+                print("[MainLoop] 准星图编码失败")
+                continue
 
-                # 编码并发送 "带准星" 的图
-                result_display, encoded_display = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 85]) # 降低一点质量以提高帧率
-                
-                if not result_display:
-                    print("[MainLoop] 准星图编码失败")
-                    continue
+            data_bytes_display = encoded_display.tobytes()
 
-                data_bytes_display = encoded_display.tobytes()
-
-                try:
-                    # [协议] 发送 TYPE_DISPLAY (0x01) + Size + Data
-                    header_type = struct.pack('!B', TYPE_DISPLAY)
-                    header_size = struct.pack('!I', len(data_bytes_display))
-                    sock.sendall(header_type + header_size + data_bytes_display)
-                
-                except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError) as e:
-                    print(f"[MainLoop] 连接中断 (C++ 窗口可能已关闭): {e}。退出...")
-                    return # 退出主循环
+            try:
+                # [协议] 发送 TYPE_DISPLAY (0x01) + Size + Data
+                header_type = struct.pack('!B', TYPE_DISPLAY)
+                header_size = struct.pack('!I', len(data_bytes_display))
+                sock.sendall(header_type + header_size + data_bytes_display)
+            
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError, OSError) as e:
+                print(f"[MainLoop] 连接中断 (C++ 窗口可能已关闭): {e}。退出...")
+                return # 退出主循环
 
 
 # --- 5. [修改] main 函数 ---
 # @profile
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    model = model_dict['densenet']
-    model = model.to(device)
-    filename = 'infrared.pkl'
-    model.load_state_dict(torch.load(filename))
-    model = model.to(device)
-    model.eval()
-    print(f"模型的默认数据类型是: {next(model.parameters()).dtype}")   
+
+    session, input_name, output_name = init_model(redness=False)
 
     # --- [修改] Socket 连接逻辑 ---
     try:
@@ -261,7 +274,7 @@ def main():
     
     # 3. 在主线程中运行推理循环
     try:
-        run_realtime_inference(model, device, inference_transform, sock)
+        run_realtime_inference(session, input_name, output_name, sock)
     except KeyboardInterrupt:
         print("用户请求退出...")
     finally:
