@@ -4,3 +4,5 @@ __pycache__/
 /test/
 /$(ALLUSERSPROFILE)/
 mock_camera_od.tar.gz
+mock_camera_od
+.DS_Store

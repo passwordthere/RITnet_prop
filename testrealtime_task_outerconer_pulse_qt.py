@@ -231,9 +231,30 @@ def run_realtime_inference(model, device, transform, sock: socket.socket):
                     print(f"[MainLoop] 连接中断 (C++ 窗口可能已关闭): {e}。退出...")
                     return # 退出主循环
 
-# --- 5. [修改] main 函数 ---
-# @profile
-def main():
+
+def init_model(onnx=False):
+    if onnx:
+        model_path = 'log/weights_infrared_best.onnx'
+        os.makedirs(trt_cache_path, exist_ok=True)
+        providers = [
+            ('TensorrtExecutionProvider', {
+                'device_id': 0,
+                'trt_fp16_enable': True,
+                'trt_engine_cache_enable': True,
+                'trt_engine_cache_path': trt_cache_path,
+            }),
+            ('CUDAExecutionProvider', {
+                'device_id': 0,
+            }),
+            'CPUExecutionProvider'
+        ]
+        session = ort.InferenceSession(model_path, providers=providers)
+        input_name = session.get_inputs()[0].name
+        output_name = session.get_outputs()[0].name
+        
+        print(f"Model loaded! Provider: {session.get_providers()}")
+        return session, input_name, output_name
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     model = model_dict['densenet']
@@ -242,7 +263,15 @@ def main():
     model.load_state_dict(torch.load(filename))
     model = model.to(device)
     model.eval()
-    print(f"模型的默认数据类型是: {next(model.parameters()).dtype}")
+    print(f"模型的默认数据类型是: {next(model.parameters()).dtype}")    
+
+    return model
+
+
+# --- 5. [修改] main 函数 ---
+# @profile
+def main():
+    model = init_model(onnx=False)
 
     # --- [修改] Socket 连接逻辑 ---
     try:
