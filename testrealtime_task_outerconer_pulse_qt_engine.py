@@ -8,7 +8,6 @@ import struct
 import threading
 import onnxruntime as ort
 import sys
-from torchvision import transforms
 
 
 def init_model(redness=False):
