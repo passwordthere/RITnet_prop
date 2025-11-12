@@ -122,7 +122,7 @@ class CameraWrapper:
             self.stConvertParam.enSrcPixelType = stDeviceList.enPixelType
             
             # 转换
-            ret = self.cam.MV_CC_ConvertPixelType(byref(self.stConvertParam))
+            ret = self.cam.MV_CC_ConvertPixelType(self.stConvertParam)
             if ret != 0:
                 print(f"[CAM {self.camera_index}] 转换像素失败! ret[0x{ret:x}]")
                 return None

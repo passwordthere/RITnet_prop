@@ -37,7 +37,7 @@ class BatchedEyeGuidanceProcessor:
         print("[Processor] 初始化完成。")
 
     def _init_model(self, redness=False):
-        model_path = 'infrared.onnx'
+        model_path = 'infraredx.onnx'
         if redness:
             model_path = 'visible.onnx'
 
@@ -65,6 +65,7 @@ class BatchedEyeGuidanceProcessor:
 
         try:
             session = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
+            # session = ort.InferenceSession(model_path, providers=providers)
             input_name = session.get_inputs()[0].name
             output_name = session.get_outputs()[0].name
 

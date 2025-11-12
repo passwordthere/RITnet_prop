@@ -26,7 +26,7 @@ def main():
 
                 combined_display = np.hstack((display_frames[0], display_frames[1]))
 
-                cv2.imshow("双相机实时推理 (按 'q' 退出)", combined_display)
+                cv2.imshow("realtime", combined_display)
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
