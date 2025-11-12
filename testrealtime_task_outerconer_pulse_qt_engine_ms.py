@@ -11,7 +11,7 @@ import sys
 
 
 def init_model(redness=False):
-    model_path = 'infrared_fp16.onnx'
+    model_path = 'infrared.onnx'
     if redness:
         model_path = 'visible.onnx'
 
@@ -127,7 +127,7 @@ class CustomPreprocess:
         # frame = cv2.resize(frame, self.target_size)
         frame_uint8 = cv2.LUT(frame, self.table.astype('uint8'))    # 注意：LUT 操作需要 uint8 输入
         frame_clahe = self.clahe.apply(frame_uint8)                 # clahe.apply 也需要 uint8 输入
-        data = frame_clahe.astype(np.float16) / 255.0
+        data = frame_clahe.astype(np.float32) / 255.0
         data = (data - 0.5) / 0.5
         data = np.expand_dims(data, axis=0) # Add channel dim: (1, 512, 768)
         data = np.expand_dims(data, axis=0) # Add batch dim: (1, 1, 512, 768)

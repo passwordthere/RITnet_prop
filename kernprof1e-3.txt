@@ -54,3 +54,25 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
     55        18          3.7      0.2      0.4                      display_frame = (combine_gpu * 255.0).byte().cpu().numpy() 
     56        18         31.0      1.7      3.3                      cv2.imwrite('test/mask/{}'.format(img_path[j].split('/')[-1]), display_frame)
 1.6(autocast)
+
+
+
+
+
+
+
+
+
+
+
+
+infrared_fp16
+==============================
+ 推理时间统计 (已移除第1帧预热)
+  总帧数: 243
+  平均耗时: 2.85 ms
+  最快耗时: 2.68 ms
+  最慢耗时: 4.05 ms
+==============================
+
+
