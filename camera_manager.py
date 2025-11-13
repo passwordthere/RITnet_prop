@@ -69,8 +69,8 @@ class MultiCameraManager:
     """
     def __init__(self, camera_indices=[0, 1]):
         print(f"[Manager] 正在初始化 {len(camera_indices)} 个相机...")
-        if sys.platform.startswith('win'):
-            mp.set_start_method('spawn', force=True)
+        if mp.get_start_method(allow_none=True) != "spawn":
+            mp.set_start_method("spawn", force=True)
         
         self.camera_indices = camera_indices
         self.processes = []

@@ -22,8 +22,17 @@ def main():
                 frame_0 = frames[0].copy()
                 frame_1 = frames[1].copy()
 
-                display_frames = processor.process_batch(frame_0, frame_1)
+                # combined_display = np.hstack((frame_0, frame_1))
+                # combined_display = cv2.resize(combined_display, (1536, 512))
 
+                # # 2. 调试检查点
+                # if frame_0 is None:
+                #     print("[DEBUG] 未收到 CAM 0 帧.")
+                # else:
+                #     print(f"[DEBUG] 收到 CAM 0 帧: Shape={frame_0.shape}, Dtype={frame_0.dtype}")
+                #     cv2.imshow('Camera 0 Output', frame_0)
+
+                display_frames = processor.process_batch(frame_0, frame_1)
                 combined_display = np.hstack((display_frames[0], display_frames[1]))
 
                 cv2.imshow("realtime", combined_display)
